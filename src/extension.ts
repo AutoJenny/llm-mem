@@ -1,6 +1,14 @@
 import * as vscode from 'vscode';
 import axios, { AxiosResponse } from 'axios';
 
+// Sanitizes a string by escaping special characters
+function sanitizeString(str: string): string {
+    return str.replace(/\\/g, '\\\\') // Escape backslashes
+              .replace(/"/g, '\\"') // Escape double quotes
+              .replace(/\n/g, '\\n') // Replace newlines with \n
+              .replace(/\r/g, '\\r'); // Replace carriage returns with \r
+}
+
 export function activate(context: vscode.ExtensionContext) {
     let disposableSendToOllama = vscode.commands.registerCommand('llm-mem.sendToOllama', async () => {
         const editor = vscode.window.activeTextEditor;
@@ -16,6 +24,8 @@ export function activate(context: vscode.ExtensionContext) {
             if (instruction) {
                 text = instruction + " " + text; // Prepend instruction if provided
             }
+
+            text = sanitizeString(text); // Sanitize the text to be used in a GraphQL query
 
             // First, search Weaviate for relevant past interactions
             const pastInteraction = await searchWeaviateForInteractions(text);
