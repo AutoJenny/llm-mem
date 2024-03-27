@@ -5,10 +5,27 @@ export function activate(context: vscode.ExtensionContext) {
     let disposableSendToOllama = vscode.commands.registerCommand('llm-mem.sendToOllama', async () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
-            const text = editor.document.getText(editor.selection);
+            let text = editor.document.getText(editor.selection);
+
+            // Show input box to prepend instructions
+            const instruction = await vscode.window.showInputBox({
+                prompt: "Type instruction to prepend to the selected text (press Enter to proceed without instructions)",
+                placeHolder: "For example, 'Explain the following code:'",
+            });
+
+            if (instruction) {
+                text = instruction + " " + text; // Prepend instruction if provided
+            }
+
+            // First, search Weaviate for relevant past interactions
+            const pastInteraction = await searchWeaviateForInteractions(text);
+            if (pastInteraction) {
+                console.log(`Found a relevant past interaction: ${pastInteraction}`);
+                text += ` Previous relevant interaction: ${pastInteraction}`; // Append past interaction to the query
+            }
 
             try {
-                // Sending the prompt to Ollama
+                // Then send the query to Ollama
                 const response: AxiosResponse<any> = await axios({
                     method: 'post',
                     url: 'http://localhost:11434/api/generate',
@@ -20,7 +37,6 @@ export function activate(context: vscode.ExtensionContext) {
                 });
 
                 let completeResponse = '';
-                // Explicitly typing 'chunk' as any to avoid TypeScript error
                 response.data.on('data', (chunk: any) => {
                     let part = chunk.toString();
                     try {
@@ -28,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
                         completeResponse += json.response;
                         if (json.done) {
                             vscode.window.showInformationMessage(completeResponse);
-                            // Log the interaction to Weaviate here
+                            // Log the interaction to Weaviate
                             logInteractionToWeaviate(text, completeResponse);
                         }
                     } catch (error) {
@@ -52,14 +68,45 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableSendToOllama);
 }
 
+async function searchWeaviateForInteractions(query: string): Promise<string | null> {
+    try {
+        const response = await axios.post('http://localhost:8080/v1/graphql', {
+            query: `
+            {
+                Get {
+                    CodingInteraction(
+                        nearText: {
+                            concepts: ["${query}"]
+                        }
+                    ) {
+                        prompt
+                        response
+                    }
+                }
+            }`,
+        });
+
+        console.log("Weaviate search response:", JSON.stringify(response.data, null, 2));
+
+        if (response.data.data && response.data.data.Get.CodingInteraction.length > 0) {
+            return response.data.data.Get.CodingInteraction[0].response;
+        } else {
+            console.log("No relevant past interactions found in Weaviate.");
+            return null;
+        }
+    } catch (error) {
+        console.error("Failed to search Weaviate:", error);
+        return null;
+    }
+}
+
 async function logInteractionToWeaviate(prompt: string, response: string) {
     const interactionData = {
         class: "CodingInteraction",
         properties: {
             prompt,
             response,
-            timestamp: new Date().toISOString(), // Ensure your Weaviate schema supports this format
-            // Add other metadata as needed
+            timestamp: new Date().toISOString(),
         }
     };
 
