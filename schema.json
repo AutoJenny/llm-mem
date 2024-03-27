@@ -1,0 +1,41 @@
+{
+    "classes": [
+      {
+        "class": "CodingInteraction",
+        "description": "Logs interactions related to coding, including prompts, responses, and metadata",
+        "properties": [
+          {
+            "name": "prompt",
+            "description": "The coding prompt/question sent to the LLM",
+            "dataType": ["text"]
+          },
+          {
+            "name": "response",
+            "description": "The response received from the LLM",
+            "dataType": ["text"]
+          },
+          {
+            "name": "timestamp",
+            "description": "The timestamp when the interaction occurred",
+            "dataType": ["date"]
+          },
+          {
+            "name": "language",
+            "description": "The programming language related to the interaction",
+            "dataType": ["string"]
+          },
+          {
+            "name": "technologies",
+            "description": "Technologies, libraries, or frameworks mentioned in the interaction",
+            "dataType": ["string[]"]
+          },
+          {
+            "name": "metadata",
+            "description": "Additional metadata about the interaction (e.g., question complexity, tags)",
+            "dataType": ["string"]
+          }
+        ]
+      }
+    ]
+  }
+  
